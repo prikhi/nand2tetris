@@ -40,5 +40,31 @@ CHIP ALU {
         ng;      // (out < 0,  1, 0)
 
     PARTS:
-    //// Replace this comment with your code.
+    // zero x & y
+    Mux16(a=x, b=false, sel=zx, out=zeroedX);
+    Mux16(a=y, b=false, sel=zy, out=zeroedY);
+
+
+    // bitwise negate x & y
+    // First negate the sign bit
+    Not16(in=zeroedX, out=flippedX);
+    Not16(in=zeroedY, out=flippedY);
+    // Then mux between flipped bit & original
+    Mux16(a=zeroedX, b=flippedX, sel=nx, out=negatedX);
+    Mux16(a=zeroedY, b=flippedY, sel=ny, out=negatedY);
+
+    // perform function
+    And16(a=negatedX, b=negatedY, out=andedXY);
+    Add16(a=negatedX, b=negatedY, out=addedXY);
+    Mux16(a=andedXY, b=addedXY, sel=f, out=result);
+
+    // not the result, set ng to sign bit, extract halfs of result
+    Not16(in=result, out=notResult);
+    Mux16(a=result, b=notResult, sel=no, out=out, out[15]=ng, out[0..7]=firstHalf, out[8..15]=secondHalf);
+
+    // calcualte zr by ORing both halves, ORing that, & negating
+    Or8Way(in=firstHalf, out=firstHalfOr);
+    Or8Way(in=secondHalf, out=secondHalfOr);
+    Or(a=firstHalfOr, b=secondHalfOr, out=anyOneBit);
+    Not(in=anyOneBit, out=zr);
 }
