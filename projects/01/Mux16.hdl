@@ -11,5 +11,46 @@ CHIP Mux16 {
     OUT out[16];
 
     PARTS:
-    //// Replace this comment with your code.
+    Not(in=sel, out=notSel);
+    And16(
+        a=a, 
+        out=aOut, 
+        b[0]=notSel,
+        b[1]=notSel,
+        b[2]=notSel,
+        b[3]=notSel,
+        b[4]=notSel,
+        b[5]=notSel,
+        b[6]=notSel,
+        b[7]=notSel,
+        b[8]=notSel,
+        b[9]=notSel,
+        b[10]=notSel,
+        b[11]=notSel,
+        b[12]=notSel,
+        b[13]=notSel,
+        b[14]=notSel,
+        b[15]=notSel
+    );
+    And16(
+        a=b, 
+        out=bOut, 
+        b[0]=sel,
+        b[1]=sel,
+        b[2]=sel,
+        b[3]=sel,
+        b[4]=sel,
+        b[5]=sel,
+        b[6]=sel,
+        b[7]=sel,
+        b[8]=sel,
+        b[9]=sel,
+        b[10]=sel,
+        b[11]=sel,
+        b[12]=sel,
+        b[13]=sel,
+        b[14]=sel,
+        b[15]=sel
+    );
+    Or16(a=aOut, b=bOut, out=out);
 }
