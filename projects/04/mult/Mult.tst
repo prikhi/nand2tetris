@@ -5,7 +5,8 @@
 
 // Tests the Mult.hack program in the CPU emulator.
 
-load Mult.hack,
+//load Mult.hack,
+load Mult.asm,
 output-file Mult.out,
 compare-to Mult.cmp,
 output-list RAM[0]%D2.6.2 RAM[1]%D2.6.2 RAM[2]%D2.6.2;
