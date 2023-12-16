@@ -32,5 +32,71 @@ CHIP CPU {
         pc[15];          // Address of next instruction
 
     PARTS:
-    //// Replace this comment with your code.
+    /* Set M as dest */
+    And(a=instruction[15], b=instruction[3], out=writeM);
+    /* Push instruction or calculation into A register */
+    Mux16(a=instruction, b=aluOut, sel=instruction[15], out=aIn);
+    
+    /* A register + load bit */
+    Not(in=instruction[15], out=notInstrBit);
+    Or(a=notInstrBit, b=instruction[5], out=aLoad);
+    ARegister(in=aIn, load=aLoad, out=aOut, out[0..14]=addressM);
+    /* D register + load bit */
+    And(a=instruction[15], b=instruction[4], out=dLoad);
+    DRegister(in=aluOut, load=dLoad, out=dOut);
+
+    /* ALU, mux y input between A & M */
+    Mux16(a=aOut, b=inM, sel=instruction[12], out=y);
+    ALU(
+        x=dOut,
+        y=y,
+        zx=instruction[11],
+        nx=instruction[10],
+        zy=instruction[9],
+        ny=instruction[8],
+        f=instruction[7],
+        no=instruction[6],
+        out=aluOut,
+        out=outM,
+        zr=aluZr,
+        ng=aluNg
+    );
+
+    /* Counter */
+    PC(in=aOut, reset=reset, load=jump, inc=notJumpReset, out[0..14]=pc);
+    Or(a=jump, b=reset, out=jumpReset);
+    Not(in=jumpReset, out=notJumpReset);
+    /* DMux the jump instruction & calculate condition from ALU signals */
+    DMux8Way(
+        in=instruction[15], sel=instruction[0..2],
+        b=gtJumpIn,
+        c=eqJumpIn,
+        d=geJumpIn,
+        e=ltJumpIn,
+        f=neJumpIn,
+        g=leJumpIn,
+        h=jmpJump
+    ); 
+    /* some helpers */
+    Not(in=aluZr, out=notAluZr);
+    Not(in=aluNg, out=notAluNg);
+    And(a=notAluNg, b=notAluZr, out=aluPos);
+    Not(in=aluPos, out=notAluPos);
+    /* > 0 */
+    And(a=gtJumpIn, b=aluPos, out=gtJump);
+    /* == 0 */
+    And(a=eqJumpIn, b=aluZr, out=eqJump);
+    /* >= 0 */
+    And (a=geJumpIn, b=notAluNg, out=geJump);
+    /* < 0 */
+    And(a=ltJumpIn, b=aluNg, out=ltJump);
+    /* != 0 */
+    And(a=neJumpIn, b=notAluZr, out=neJump);
+    /* <= 0 */
+    And(a=leJumpIn, b=notAluPos, out=leJump);
+    /* Combine them to determine if we should jump */ 
+    Or8Way(out=jump, 
+        in[0]=gtJump, in[1]=eqJump, in[2]=geJump, in[3]=ltJump, 
+        in[4]=neJump, in[5]=leJump, in[6]=jmpJump);
+
 }
