@@ -28,3 +28,7 @@ It takes a `.asm` file & spits out a `.hack` file in the same directory.
 ## LICENSE
 
 GPL-3.0+
+
+
+[ghcup]: https://www.haskell.org/ghcup/
+[stack]: https://www.haskellstack.org/
