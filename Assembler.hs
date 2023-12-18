@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Main where
+module Assembler where
 
 import Control.Monad (void)
 import Data.Bits (testBit)
@@ -480,7 +480,7 @@ generateDestination ls =
     , bitIfHasL M
     ]
   where
-    bitIfHasL l = if elem l ls then '1' else '0'
+    bitIfHasL l = if l `elem` ls then '1' else '0'
 
 
 generateJump :: Jump -> String
