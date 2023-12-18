@@ -59,7 +59,7 @@ runAssembler asmPath = do
 -- TYPES
 
 data Line
-    = Comment
+    = Comment String
     | Blank
     | InstructionLine !Instruction
     deriving (Show)
@@ -185,10 +185,11 @@ parseAssemblyLine =
             ['\r'] -> get >> pure Blank
             _ -> fail "parseBlankLine: Expected to see empty result or carriage return."
     parseComment :: ReadP Line
-    parseComment = do
-        void $ string "//"
-        void $ munch (`notElem` "\r\n")
-        pure Comment
+    parseComment =
+        fmap Comment $
+            (<>)
+                <$> string "//"
+                <*> munch (`notElem` "\r\n")
     parseAddressInstruction :: ReadP Line
     parseAddressInstruction = do
         void $ char '@'
