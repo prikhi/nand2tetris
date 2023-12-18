@@ -30,7 +30,7 @@ runParser inputText =
                 Nothing ->
                     error $
                         "runParser: Could not parse input line. Attempts:\n\t"
-                            <> L.intercalate "\n\t" (map show parseResult)
+                            <> L.intercalate "\n\t" (map show $ L.sortOn (length . snd) parseResult)
 
 
 -- | Parse all the lines of the file

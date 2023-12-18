@@ -6,10 +6,8 @@ module Assembler.Types where
 import Data.Word (Word16)
 
 
--- TYPES
-
 data AssemblyLine
-    = AssemblyComment String
+    = AssemblyComment !String
     | AssemblyBlankLine
     | InstructionLine !Instruction
     deriving (Show)
