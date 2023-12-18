@@ -15,14 +15,23 @@ assembler, and will likely need [stack][stack] for further projects.
 Project 6 is an Assembler to convert Hack assembly programs into machine code
 for the Hack hardware platform. It is located in the `Assembler.hs` file.
 
+The assembler takes a `.asm` file as input & spits out the generated machine
+code in a `.hack` file located in the same directory as the input file.
+
 It only uses the standard library so you only need GHC installed & can run it
 with `runghc`:
 
 ```sh
-runghc Assembler.hs projects/06/pong/Pong.asm
+runghc --ghc-arg='-Wall' Assembler.hs projects/06/pong/Pong.asm
 ```
 
-It takes a `.asm` file & spits out a `.hack` file in the same directory.
+You can also compile the code into an executable instead of interpreting it:
+
+```sh
+ghc -Wcompat -Wall -Werror -O2 -RTS -threaded -odir dist -hidir dist \
+    Assembly/* Assembler.hs -main-is Assembler -o assembler
+./assembler projects/06/pong/Pong.asm
+```
 
 
 ## LICENSE
