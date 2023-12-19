@@ -39,10 +39,13 @@ runTranslator :: FilePath -> IO ()
 runTranslator vmPath = do
     inputText <- readFile' vmPath
     let parsedCommands = runParser inputText
-    let generatedAssembly = generateAssembly parsedCommands
+    let baseFileName = stripExtension $ getFileName vmPath
+    let generatedAssembly = generateAssembly baseFileName parsedCommands
     let outputPath = stripExtension vmPath <> ".asm"
     writeFile outputPath $ unlines $ map renderAssemblyLine generatedAssembly
   where
+    getFileName :: FilePath -> FilePath
+    getFileName = reverse . takeWhile (`notElem` "/\\") . reverse
     stripExtension :: FilePath -> FilePath
     stripExtension fp = case reverse fp of
         'm' : 'v' : '.' : rest ->

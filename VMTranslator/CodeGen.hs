@@ -18,18 +18,21 @@ import VMTranslator.Types
 --
 -- Each set of instructions will have it's original VM command prepended in
 -- a comment.
-generateAssembly :: [(String, Command)] -> [AssemblyLine]
-generateAssembly cs =
+--
+-- We take in the basename of the file we are generating assembly for. This
+-- lets us generate symbol addresses for each Static segment index.
+generateAssembly :: FilePath -> [(String, Command)] -> [AssemblyLine]
+generateAssembly fileName cs =
     let (_, concat . reverse -> assemblyCode) =
-            L.foldl' generateCommand (initialDynamicLabelCounter, []) cs
+            L.foldl' (generateCommand fileName) (initialDynamicLabelCounter, []) cs
      in assemblyCode <> endLoop
 
 
-generateCommand :: (DynamicLabelCounter, [[AssemblyLine]]) -> (String, Command) -> (DynamicLabelCounter, [[AssemblyLine]])
-generateCommand (nextDyanmicLabel, generated) (original, command) = case command of
+generateCommand :: FilePath -> (DynamicLabelCounter, [[AssemblyLine]]) -> (String, Command) -> (DynamicLabelCounter, [[AssemblyLine]])
+generateCommand fileName (nextDyanmicLabel, generated) (original, command) = case command of
     StackCommand c ->
         ( nextDyanmicLabel
-        , toLines (generateStackCommand c) : generated
+        , toLines (generateStackCommand fileName c) : generated
         )
     ArithLogicCommand c ->
         second ((: generated) . toLines) $ generateArithLogicCommand nextDyanmicLabel c
@@ -39,9 +42,58 @@ generateCommand (nextDyanmicLabel, generated) (original, command) = case command
         AssemblyComment (" " <> original) : map InstructionLine instrs
 
 
-generateStackCommand :: StackCommand -> [Instruction]
-generateStackCommand = \case
+-- | Generate the assembly for the push & pop commands.
+--
+-- Pointer segments are special, they directly manipulate the base
+-- addresses in @THIS@ & @THAT@ instead of the _values_ at the given
+-- addresses.
+--
+-- Temp segments behave similarly, mapping the indexes to the special @R5@
+-- to @R12@ symbols.
+--
+-- Static segments generate a symbol address for each index:
+-- @<FileName>.<index>@. By converting the indexes to symbols, each file's
+-- unique index can claim a register between 16 & 255.
+--
+-- For all other segments, we can emit optimized instructions for the case
+-- where the index is zero, as the
+generateStackCommand :: FilePath -> StackCommand -> [Instruction]
+generateStackCommand fileName c = case c of
     Push segment index
+        | segment == Pointer ->
+            -- Pushing a pointer segment means pushing the address itself,
+            -- not the value at the address:
+            --
+            -- > @THIS
+            -- > D = M
+            -- > @SP
+            -- > M = M+1
+            -- > A = M-1
+            -- > M = D
+            [ getPointerAddress index
+            , set [D] $ A.Constant M
+            ]
+                <> pushDToStack
+        | segment == Temp ->
+            -- Temp segments behave like pointers.
+            [ getTempAddress index
+            , set [D] $ A.Constant M
+            ]
+                <> pushDToStack
+        | segment == Static ->
+            -- Each index of static segments have their own symbol, so we
+            -- can fetch & push via the symbol address:
+            --
+            -- > @<FileName>.<index>
+            -- > D = M
+            -- > @SP
+            -- > MA = M+1
+            -- > A = M-1
+            -- > M = D
+            [ getStaticAddress index
+            , set [D] $ A.Constant M
+            ]
+                <> pushDToStack
         | segment == Constant ->
             -- For pushing constants we can just do:
             --
@@ -49,21 +101,200 @@ generateStackCommand = \case
             -- > D = A
             -- > @SP
             -- > M = M+1
-            -- > A = M
-            -- > A = A-1
+            -- > A = M-1
             -- > M = D
             [ constantAddress index
             , set [D] $ A.Constant A
-            , stackPointer
-            , set [M, A] $ Unary A.Increment M
-            , set [A] $ Unary A.Decrement A
-            , set [M] $ A.Constant D
             ]
-    c@(Pop segment _)
+                <> pushDToStack
+        | index < 0 ->
+            error $ "generateStackCommand: Negative indexes are disallowed: " <> show c
+        | index == 0 ->
+            -- When the index is 0, we can do a simple read & push:
+            --
+            -- > @segment
+            -- > A = M
+            -- > D = M
+            -- > @SP
+            -- > MA = M + 1
+            -- > A = A - 1
+            -- > M = D
+            [ getOtherAddress segment
+            , set [A] $ A.Constant M
+            , set [D] $ A.Constant M
+            ]
+                <> pushDToStack
+        | otherwise ->
+            -- To push arbitrary segment locations, we need to do:
+            --
+            -- > @<index>
+            -- > D = A
+            -- > @<segment>
+            -- > A = M + D
+            -- > D = M
+            -- > @SP
+            -- > MA = M + 1
+            -- > A = A - 1
+            -- > M = D
+            [ constantAddress index
+            , set [D] $ A.Constant A
+            , getOtherAddress segment
+            , set [A] $ Binary M A.Add D
+            , set [D] $ A.Constant M
+            ]
+                <> pushDToStack
+    Pop segment index
         | segment == Constant ->
-            -- Popping to a constant is invalid
             error $ "generateStackCommand: Cannot pop to constant segment: " <> show c
-    _ -> []
+        | index < 0 ->
+            error $ "generateStackCommand: Negative indexes are disallowed: " <> show c
+        | segment == Pointer ->
+            -- Popping to a pointer segment means writing the stack value
+            -- directly into THIS or THAT, not the value referenced by THIS
+            -- or THAT:
+            --
+            -- > @SP
+            -- > MA = M - 1
+            -- > D = M
+            -- > @THIS
+            -- > M = D
+            popToD
+                <> [ getPointerAddress index
+                   , set [M] $ A.Constant D
+                   ]
+        | segment == Temp ->
+            -- Temp segments behave like pointers.
+            popToD
+                <> [ getTempAddress index
+                   , set [M] $ A.Constant D
+                   ]
+        | segment == Static ->
+            -- Each index of static segments have their own symbol, so we
+            -- can pop & then write to the symbol address:
+            --
+            -- > @SP
+            -- > MA = M - 1
+            -- > D = M
+            -- > @<FileName>.<index>
+            -- > M = D
+            popToD
+                <> [ getStaticAddress index
+                   , set [M] $ A.Constant D
+                   ]
+        | index == 0 ->
+            -- When the index is 0, we can do a simple pop & write:
+            --
+            -- > @SP
+            -- > MA = M - 1
+            -- > D = M
+            -- > @<segment>
+            -- > A = M
+            -- > M = D
+            popToD
+                <> [ getOtherAddress segment
+                   , set [A] $ A.Constant M
+                   , set [M] $ A.Constant D
+                   ]
+        | otherwise ->
+            -- To pop into arbitrary segment locations, we need to save the
+            -- target location to @R13@ to juggle the CPU registers between
+            -- tracking the destination & the popped value:
+            --
+            -- > @index
+            -- > D = A
+            -- > @<segment>
+            -- > D = D + M
+            -- > @R13
+            -- > M = D
+            -- > @SP
+            -- > MA = M - 1
+            -- > D = M
+            -- > @R13
+            -- > A = M
+            -- > M = D
+            concat
+                [
+                    [ constantAddress index
+                    , set [D] $ A.Constant A
+                    , getOtherAddress segment
+                    , set [D] $ Binary D A.Add M
+                    , internalVMRegister
+                    , set [M] $ A.Constant D
+                    , stackPointer
+                    ]
+                , popToD
+                ,
+                    [ internalVMRegister
+                    , set [A] $ A.Constant M
+                    , set [M] $ A.Constant D
+                    ]
+                ]
+  where
+    getPointerAddress :: Word16 -> Instruction
+    getPointerAddress =
+        symbolAddress . \case
+            0 -> "THIS"
+            1 -> "THAT"
+            _ ->
+                error $
+                    "generateStackCommand: Unsupported index for pointer segment: "
+                        <> show c
+
+    getTempAddress :: Word16 -> Instruction
+    getTempAddress =
+        symbolAddress . \case
+            0 -> "R5"
+            1 -> "R6"
+            2 -> "R7"
+            3 -> "R8"
+            4 -> "R9"
+            5 -> "R10"
+            6 -> "R11"
+            7 -> "R12"
+            _ ->
+                error $
+                    "generateStackCommand: Unsupported index for temp segment: "
+                        <> show c
+
+    getStaticAddress :: Word16 -> Instruction
+    getStaticAddress ix =
+        symbolAddress $ fileName <> "." <> show ix
+
+    getOtherAddress :: MemorySegment -> Instruction
+    getOtherAddress = \case
+        Argument -> symbolAddress "ARG"
+        Local -> symbolAddress "LCL"
+        This -> symbolAddress "THIS"
+        That -> symbolAddress "THAT"
+        _ ->
+            error $
+                "generateStackCommand: PROGRAMMER ERROR: attempted to call getOtherAddress for invalid segment: "
+                    <> show c
+
+    -- Push the value in the D register onto the stack:
+    --
+    -- > @SP
+    -- > MA = M + 1
+    -- > A = A - 1
+    -- > M = D
+    pushDToStack :: [Instruction]
+    pushDToStack =
+        [ stackPointer
+        , set [M, A] $ Unary A.Increment M
+        , set [A] $ Unary A.Decrement A
+        , set [M] $ A.Constant D
+        ]
+    -- Pop the stack into the D register:
+    --
+    -- > @SP
+    -- > MA = M - 1
+    -- > D = M
+    popToD :: [Instruction]
+    popToD =
+        [ stackPointer
+        , set [M, A] $ Unary A.Decrement M
+        , set [D] $ A.Constant M
+        ]
 
 
 generateArithLogicCommand :: DynamicLabelCounter -> ArithLogicCommand -> (DynamicLabelCounter, [Instruction])
@@ -221,35 +452,10 @@ stackPointer :: Instruction
 stackPointer = symbolAddress "SP"
 
 
-{-
--- | Text for label & jump address to set latest item to @-1@, our
--- equivalent of 'True'.
-comparisonTrueSymbol :: String
-comparisonTrueSymbol = "VM_TRANSLATOR_SET_ZERO"
+-- | Go to @R13@, which is the first reserved slot for internal VM use.
+internalVMRegister :: Instruction
+internalVMRegister = symbolAddress "R13"
 
--- | Text for label & jump address to set latest item to @0@, our
--- equivalent of 'False'.
-comparisonFalseSymbol :: String
-comparisonFalseSymbol = "VM_TRANSLATOR_COMPARISON_FALSE"
-
--- | Emit the Label & computation sections for conditional results.
---
--- The general form is:
---
--- > (<label>)
--- > @SP
--- > A = M - 1
--- > M = <val>
-conditionalResults :: [AssemblyLine]
-conditionalResults =
-    [ AssemblyComment " comparison true, set last to -1"
-    , InstructionLine $ LabelInstruction comparisonTrueSymbol
-    , InstructionLine stackPointer
-    , InstructionLine $ set [A] $ Unary A.Decrement M
-    , InstructionLine $ set [M] $ NegativeOne
-    , AssemblyComment
-    ]
--}
 
 -- | End of program loop
 endLoop :: [AssemblyLine]
