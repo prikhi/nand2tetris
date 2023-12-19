@@ -29,7 +29,7 @@ data MemorySegment
     | That
     | Pointer
     | Temp
-    deriving (Show)
+    deriving (Eq, Show)
 
 
 -- | Commands of the VM Language

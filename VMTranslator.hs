@@ -2,10 +2,12 @@
 
 module VMTranslator (main) where
 
+import Assembler.Render (renderAssemblyLine)
 import Data.List (intercalate)
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
 import System.IO (readFile')
+import VMTranslator.CodeGen (generateAssembly)
 import VMTranslator.Parser (runParser)
 
 
@@ -37,12 +39,10 @@ runTranslator :: FilePath -> IO ()
 runTranslator vmPath = do
     inputText <- readFile' vmPath
     let parsedCommands = runParser inputText
-    mapM_ print parsedCommands
+    let generatedAssembly = generateAssembly parsedCommands
+    let outputPath = stripExtension vmPath <> ".asm"
+    writeFile outputPath $ unlines $ map renderAssemblyLine generatedAssembly
   where
-    -- let binaryInstructions = generateInstructions parsedAssembly
-    -- let outputPath = stripExtension asmPath <> ".asm"
-    -- writeFile outputPath $ unlines binaryInstructions
-
     stripExtension :: FilePath -> FilePath
     stripExtension fp = case reverse fp of
         'm' : 'v' : '.' : rest ->

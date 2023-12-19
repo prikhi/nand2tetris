@@ -4,13 +4,13 @@
 
 Allows emitting of assembly files by building line values in code.
 -}
-module Assembler.Render where
+module Assembler.Render (renderAssemblyLine) where
 
 import Assembler.Types
 
 
-renderLine :: AssemblyLine -> String
-renderLine = \case
+renderAssemblyLine :: AssemblyLine -> String
+renderAssemblyLine = \case
     AssemblyBlankLine -> ""
     AssemblyComment text -> "//" <> text
     InstructionLine instruction -> renderInstruction instruction
@@ -24,8 +24,17 @@ renderInstruction = \case
     ComputeInstruction mbDests computation mbJumps ->
         maybe "" renderDests mbDests <> renderComputation computation <> maybe "" renderJump mbJumps
   where
+    -- while _we_ allow parsing destinations in any order, the course tools
+    -- require this to be ordered
     renderDests :: [Location] -> String
-    renderDests ls = concatMap show ls <> "="
+    renderDests ls =
+        concat $
+            concat
+                [ [show A | A `elem` ls]
+                , [show D | D `elem` ls]
+                , [show M | M `elem` ls]
+                , ["="]
+                ]
 
     renderJump :: Jump -> String
     renderJump jump =
@@ -48,6 +57,8 @@ renderComputation = \case
     Unary op loc -> renderUnaryOp loc op
     Binary l1 op l2 -> show l1 <> renderBinaryOp op <> show l2
   where
+    -- we parse Increment with the location on either side but course tools
+    -- expect it to be first
     renderUnaryOp :: Location -> UnaryOp -> String
     renderUnaryOp loc = \case
         Not -> "!" <> show loc

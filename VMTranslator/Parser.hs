@@ -5,7 +5,7 @@
 module VMTranslator.Parser (runParser) where
 
 import Control.Monad (void)
-import Data.Char (isAlphaNum, isDigit)
+import Data.Char (isDigit)
 import Data.List qualified as L
 import Data.Maybe (mapMaybe)
 import Text.ParserCombinators.ReadP
@@ -114,11 +114,6 @@ parseMemorySegment =
 
 
 -- TODO: Utils.Parsers
-
--- | Consume an optional carriage return & required newline
-newline :: ReadP ()
-newline = void $ optional (char '\r') >> char '\n'
-
 
 -- | Consume space & tab characters
 spaceChars :: ReadP ()

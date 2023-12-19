@@ -10,8 +10,6 @@ import System.Exit (exitFailure)
 import System.IO (readFile')
 
 
--- MAIN
-
 -- | Valiate args & run
 main :: IO ()
 main =
@@ -23,12 +21,12 @@ main =
                 unlines
                     [ "ERROR: Expected 1 argument, assembly file name, got: "
                     , ""
-                    , "\t" <> (intercalate ", " $ map show args)
+                    , "\t" <> intercalate ", " (map show args)
                     , ""
                     , "Assembler.hs <FILE_NAME>.asm"
                     , ""
                     , "Reads input file."
-                    , "Translates to Hack Hack machine code."
+                    , "Translates to Hack machine code."
                     , "Write results to <FILE_NAME>.hack in same directory as input file."
                     ]
             exitFailure
