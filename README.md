@@ -29,8 +29,33 @@ You can also compile the code into an executable instead of interpreting it:
 
 ```sh
 ghc -Wcompat -Wall -Werror -O2 -RTS -threaded -odir dist -hidir dist \
-    Assembly/* Assembler.hs -main-is Assembler -o assembler
+    Assembler/* Assembler.hs -main-is Assembler -o assembler
 ./assembler projects/06/pong/Pong.asm
+```
+
+
+## VM Translator
+
+Project 7 is a basic VM Translator that converts our VM's intermediate code
+into assembly code for the Hack hardware. It is located in the
+`VMTranslator.hs` file.
+
+The basic translator only handle arithmetic-logic commands & stack commands. It
+takes a `.vm` file as input & spits out the generated assembly code in a `.asm`
+file located in the same directory as the input file.
+
+It also only uses the standard library & requires no external dependencies:
+
+```sh
+runghc --ghc-arg='-Wall' VMTranslator.hs projects/07/MemoryAccess/StaticTest/StaticTest.vm
+```
+
+You can compile it into an exectuable as well:
+
+```sh
+ghc -Wcompat -Wall -Werror -O2 -RTS -threaded -odir dist -hidir dist \
+    Assembler/* VMTranslator/* VMTranslator.hs -main-is VMTranslator -o vm-translator
+./vm-translator projects/07/MemoryAccess/StaticTest/StaticTest.vm
 ```
 
 
