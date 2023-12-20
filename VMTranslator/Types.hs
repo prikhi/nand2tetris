@@ -36,6 +36,7 @@ data MemorySegment
 data Command
     = StackCommand !StackCommand
     | ArithLogicCommand !ArithLogicCommand
+    | BranchCommand !BranchCommand
     deriving (Show)
 
 
@@ -55,4 +56,11 @@ data ArithLogicCommand
     | And
     | Or
     | Not
+    deriving (Show)
+
+
+data BranchCommand
+    = Label !String
+    | Goto !String
+    | IfGoto !String
     deriving (Show)

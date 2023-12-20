@@ -5,7 +5,7 @@
 module VMTranslator.Parser (runParser) where
 
 import Control.Monad (void)
-import Data.Char (isDigit)
+import Data.Char (isAlphaNum, isDigit)
 import Data.List qualified as L
 import Data.Maybe (mapMaybe)
 import Text.ParserCombinators.ReadP
@@ -41,6 +41,7 @@ parseVMLine =
                 <++ (VMCommand <$> parseCommand)
            )
         <* spaceChars
+        <* optional parseComment
         <* munch (== '\r')
     )
         <++ parseBlankLine
@@ -63,6 +64,7 @@ parseCommand =
     choice
         [ StackCommand <$> parseStackCommand
         , ArithLogicCommand <$> parseArithLogicCommand
+        , BranchCommand <$> parseBranchCommand
         ]
 
 
@@ -94,6 +96,21 @@ parseArithLogicCommand =
             , (Or, "or")
             , (Not, "not")
             ]
+
+
+parseBranchCommand :: ReadP BranchCommand
+parseBranchCommand = do
+    constr <-
+        choice
+            [ Label <$ string "label"
+            , Goto <$ string "goto"
+            , IfGoto <$ string "if-goto"
+            ]
+    spaceChars
+    constr <$> munch1 isLabelChar
+  where
+    isLabelChar :: Char -> Bool
+    isLabelChar c = any ($ c) [isAlphaNum, (== '_'), (== '.'), (== ':')]
 
 
 -- TODO: map c s to Utils

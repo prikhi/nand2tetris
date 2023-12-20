@@ -36,6 +36,10 @@ generateCommand fileName (nextDyanmicLabel, generated) (original, command) = cas
         )
     ArithLogicCommand c ->
         second ((: generated) . toLines) $ generateArithLogicCommand nextDyanmicLabel c
+    BranchCommand c ->
+        ( nextDyanmicLabel
+        , toLines (generateBranchCommand fileName c) : generated
+        )
   where
     toLines :: [Instruction] -> [AssemblyLine]
     toLines instrs =
@@ -284,17 +288,6 @@ generateStackCommand fileName c = case c of
         , set [A] $ Unary A.Decrement A
         , set [M] $ A.Constant D
         ]
-    -- Pop the stack into the D register:
-    --
-    -- > @SP
-    -- > MA = M - 1
-    -- > D = M
-    popToD :: [Instruction]
-    popToD =
-        [ stackPointer
-        , set [M, A] $ Unary A.Decrement M
-        , set [D] $ A.Constant M
-        ]
 
 
 generateArithLogicCommand :: DynamicLabelCounter -> ArithLogicCommand -> (DynamicLabelCounter, [Instruction])
@@ -394,6 +387,37 @@ generateArithLogicCommand counter = \case
             )
 
 
+-- | Generating branching commands. These are simple label instructions and
+-- jump commands.
+--
+-- TODO: these are supposed to be contained to the current function they
+-- reside in. However, we don't yet support functions. Eventually we will
+-- pull that in. We should maybe create a big old TranslatorState type to
+-- track the filename, label counter, & current function, all in one type.
+generateBranchCommand :: FilePath -> BranchCommand -> [Instruction]
+generateBranchCommand fileName = \case
+    Label labelSymbol ->
+        -- Label command just output a label location, prefixed with the
+        -- current filename & function.
+        [ LabelInstruction $ makeLabel labelSymbol
+        ]
+    Goto labelSymbol ->
+        -- Goto commands always jump to the referenced label.
+        [ AddressInstruction $ SymbolAddress $ makeLabel labelSymbol
+        , unconditionalJump
+        ]
+    IfGoto labelSymbol ->
+        -- IfGoto commands pop the stack & jump to the label if it is
+        -- non-zero.
+        popToD
+            <> [ AddressInstruction $ SymbolAddress $ makeLabel labelSymbol
+               , jumpOnD JumpNE
+               ]
+  where
+    makeLabel :: String -> String
+    makeLabel sym = fileName <> ".TODO$" <> sym
+
+
 -- HELPERS
 
 constantAddress :: Word16 -> Instruction
@@ -412,8 +436,25 @@ jumpOnD :: Jump -> Instruction
 jumpOnD = ComputeInstruction Nothing (A.Constant D) . Just
 
 
+unconditionalJump :: Instruction
+unconditionalJump = ComputeInstruction Nothing A.Zero (Just JumpJP)
+
+
 set :: [Location] -> Computation -> Instruction
 set ls = computeNoJump (Just ls)
+
+
+-- | Pop the stack into the D register:
+--
+-- > @SP
+-- > MA = M - 1
+-- > D = M
+popToD :: [Instruction]
+popToD =
+    [ stackPointer
+    , set [M, A] $ Unary A.Decrement M
+    , set [D] $ A.Constant M
+    ]
 
 
 makeConditionalTrueLabel :: DynamicLabelCounter -> (DynamicLabelCounter, Instruction, Address)
