@@ -1,5 +1,6 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- | Generate assembly code from our parsed VM types.
@@ -24,23 +25,44 @@ import VMTranslator.Types
 generateAssembly :: FilePath -> [(String, Command)] -> [AssemblyLine]
 generateAssembly fileName cs =
     let (_, concat . reverse -> assemblyCode) =
-            L.foldl' (generateCommand fileName) (initialDynamicLabelCounter, []) cs
+            L.foldl' generateCommand (initialState fileName, []) cs
      in assemblyCode <> endLoop
 
 
-generateCommand :: FilePath -> (DynamicLabelCounter, [[AssemblyLine]]) -> (String, Command) -> (DynamicLabelCounter, [[AssemblyLine]])
-generateCommand fileName (nextDyanmicLabel, generated) (original, command) = case command of
+data TranslatorState = TranslatorState
+    { currentFunction :: String
+    , labelCounter :: DynamicLabelCounter
+    , fileName :: FilePath
+    }
+    deriving (Show)
+
+
+initialState :: FilePath -> TranslatorState
+initialState fileName =
+    TranslatorState
+        { currentFunction = ""
+        , labelCounter = initialDynamicLabelCounter
+        , fileName
+        }
+
+
+generateCommand :: (TranslatorState, [[AssemblyLine]]) -> (String, Command) -> (TranslatorState, [[AssemblyLine]])
+generateCommand (state, generated) (original, command) = case command of
     StackCommand c ->
-        ( nextDyanmicLabel
-        , toLines (generateStackCommand fileName c) : generated
-        )
-    ArithLogicCommand c ->
-        second ((: generated) . toLines) $ generateArithLogicCommand nextDyanmicLabel c
+        noStateChanges $ generateStackCommand state c
     BranchCommand c ->
-        ( nextDyanmicLabel
-        , toLines (generateBranchCommand fileName c) : generated
-        )
+        noStateChanges $ generateBranchCommand state c
+    ArithLogicCommand c ->
+        withStateChanges $ generateArithLogicCommand state c
+    FunctionCommand c ->
+        withStateChanges $ generateFunctionCommand state c
   where
+    withStateChanges :: (TranslatorState, [Instruction]) -> (TranslatorState, [[AssemblyLine]])
+    withStateChanges =
+        second ((: generated) . toLines)
+    noStateChanges :: [Instruction] -> (TranslatorState, [[AssemblyLine]])
+    noStateChanges instrs =
+        (state, toLines instrs : generated)
     toLines :: [Instruction] -> [AssemblyLine]
     toLines instrs =
         AssemblyComment (" " <> original) : map InstructionLine instrs
@@ -61,8 +83,8 @@ generateCommand fileName (nextDyanmicLabel, generated) (original, command) = cas
 --
 -- For all other segments, we can emit optimized instructions for the case
 -- where the index is zero, as the
-generateStackCommand :: FilePath -> StackCommand -> [Instruction]
-generateStackCommand fileName c = case c of
+generateStackCommand :: TranslatorState -> StackCommand -> [Instruction]
+generateStackCommand state c = case c of
     Push segment index
         | segment == Pointer ->
             -- Pushing a pointer segment means pushing the address itself,
@@ -262,7 +284,7 @@ generateStackCommand fileName c = case c of
 
     getStaticAddress :: Word16 -> Instruction
     getStaticAddress ix =
-        symbolAddress $ fileName <> "." <> show ix
+        symbolAddress $ state.fileName <> "." <> show ix
 
     getOtherAddress :: MemorySegment -> Instruction
     getOtherAddress = \case
@@ -290,8 +312,8 @@ generateStackCommand fileName c = case c of
         ]
 
 
-generateArithLogicCommand :: DynamicLabelCounter -> ArithLogicCommand -> (DynamicLabelCounter, [Instruction])
-generateArithLogicCommand counter = \case
+generateArithLogicCommand :: TranslatorState -> ArithLogicCommand -> (TranslatorState, [Instruction])
+generateArithLogicCommand state = \case
     Neg -> performUnaryOp A.Negate
     Not -> performUnaryOp A.Not
     Add -> performNonComparisonBinaryOp A.Add
@@ -307,9 +329,9 @@ generateArithLogicCommand counter = \case
     -- > @SP
     -- > A = M - 1
     -- > M = <op> M
-    performUnaryOp :: A.UnaryOp -> (DynamicLabelCounter, [Instruction])
+    performUnaryOp :: A.UnaryOp -> (TranslatorState, [Instruction])
     performUnaryOp op =
-        ( counter
+        ( state
         ,
             [ stackPointer
             , set [A] $ Unary A.Decrement M
@@ -324,9 +346,9 @@ generateArithLogicCommand counter = \case
     -- > D = M
     -- > A = A - 1
     -- > M = M <op> D
-    performNonComparisonBinaryOp :: A.BinaryOp -> (DynamicLabelCounter, [Instruction])
+    performNonComparisonBinaryOp :: A.BinaryOp -> (TranslatorState, [Instruction])
     performNonComparisonBinaryOp op =
-        ( counter
+        ( state
         ,
             [ stackPointer
             , set [M, A] $ Unary A.Decrement M
@@ -356,17 +378,17 @@ generateArithLogicCommand counter = \case
     -- > A = M - 1
     -- > M = M - 1
     --
-    -- The label is dynamically generated & we return an incremented
-    -- counter.
+    -- The label is dynamically generated & we update the Translator state
+    -- with an incremented counter.
     --
     -- Note that we subtract the top item of the stack from the 2nd item,
     -- so jump comparisons should be equivalent to the command operation.
     --
     -- TODO: is it possible to make this a single "@SP; A = M - 1" instead of two?
-    performComparisonOp :: Jump -> (DynamicLabelCounter, [Instruction])
+    performComparisonOp :: Jump -> (TranslatorState, [Instruction])
     performComparisonOp jump =
-        let (nextCounter, label, labelAddress) = makeConditionalTrueLabel counter
-         in ( nextCounter
+        let (nextCounter, label, labelAddress) = makeConditionalTrueLabel state.labelCounter
+         in ( state {labelCounter = nextCounter}
             ,
                 [ stackPointer
                 , set [M, A] $ Unary A.Decrement M
@@ -389,16 +411,10 @@ generateArithLogicCommand counter = \case
 
 -- | Generating branching commands. These are simple label instructions and
 -- jump commands.
---
--- TODO: these are supposed to be contained to the current function they
--- reside in. However, we don't yet support functions. Eventually we will
--- pull that in. We should maybe create a big old TranslatorState type to
--- track the filename, label counter, & current function, all in one type.
-generateBranchCommand :: FilePath -> BranchCommand -> [Instruction]
-generateBranchCommand fileName = \case
+generateBranchCommand :: TranslatorState -> BranchCommand -> [Instruction]
+generateBranchCommand state = \case
     Label labelSymbol ->
-        -- Label command just output a label location, prefixed with the
-        -- current filename & function.
+        -- Label command just output a label location.
         [ LabelInstruction $ makeLabel labelSymbol
         ]
     Goto labelSymbol ->
@@ -414,8 +430,141 @@ generateBranchCommand fileName = \case
                , jumpOnD JumpNE
                ]
   where
+    -- Labels for branch commands are local to their File & Function names.
     makeLabel :: String -> String
-    makeLabel sym = fileName <> ".TODO$" <> sym
+    makeLabel sym = state.fileName <> "." <> state.currentFunction <> "$" <> sym
+
+
+-- | Function commands manipulate the global stack frame and translator
+-- state.
+generateFunctionCommand :: TranslatorState -> FunctionCommand -> (TranslatorState, [Instruction])
+generateFunctionCommand state = \case
+    Function functionName argCount ->
+        -- Function commands alter the current function name, emit a label
+        -- for the function & initialize it's local argument segment to
+        -- zeros:
+        --
+        -- > (<fileName>.<functionName>)
+        -- > @LCL
+        -- > A = M
+        -- > // for <argCount>:
+        -- > M = 0
+        -- > A = A + 1
+        -- > //
+        -- > @<argCount>
+        -- > D = A
+        -- > @SP
+        -- > M = M + D
+        ( state {currentFunction = functionName}
+        , concat
+            [
+                [ LabelInstruction $ state.fileName <> "." <> functionName
+                , symbolAddress "LCL"
+                , set [A] $ A.Constant M
+                ]
+            , concat
+                [ set [M] Zero
+                    : [set [A] $ Unary A.Increment A | i /= argCount]
+                | i <- [1 .. argCount]
+                ]
+            ,
+                [ constantAddress argCount
+                , set [D] $ A.Constant A
+                , stackPointer
+                , set [M] $ Binary M A.Add D
+                ]
+            ]
+        )
+    Return ->
+        -- Return manages the global stack after a function call is
+        -- completed, restoring the calling functions stack frame & putting
+        -- the result at the top of it's stack:
+        --
+        -- > // set R13 to just above caller's stack frame(aka LCL)
+        -- > @LCL
+        -- > D = M
+        -- > @R13
+        -- > M = D
+        -- > // set R14 to return address
+        -- > @5
+        -- > A = D - A
+        -- > D = M
+        -- > @R14
+        -- > M = D
+        -- > // pop stack to ARG value
+        -- > @SP
+        -- > MA = M - 1
+        -- > D = M
+        -- > @ARG
+        -- > A = M
+        -- > M = D
+        -- > // update the stack pointer
+        -- > D = A + 1
+        -- > @SP
+        -- > M = D
+        -- > // restore THAT, THIS, ARG, & LCL
+        -- > @R13
+        -- > AM = M - 1
+        -- > D = M
+        -- > @THAT
+        -- > M = D
+        -- > @R13
+        -- > AM = M - 1
+        -- > D = M
+        -- > @THIS
+        -- > M = D
+        -- > @R13
+        -- > AM = M - 1
+        -- > D = M
+        -- > @ARG
+        -- > M = D
+        -- > @R13
+        -- > AM = M - 1
+        -- > D = M
+        -- > @LCL
+        -- > M = D
+        -- > // jump to the return address
+        -- > @R14
+        -- > A = M
+        -- > 0;JMP
+        ( state
+        , concat
+            [
+                [ symbolAddress "LCL"
+                , set [D] $ A.Constant M
+                , internalVMRegister
+                , set [M] $ A.Constant D
+                , constantAddress 5
+                , set [A] $ Binary D A.Subtract A
+                , set [D] $ A.Constant M
+                , internalVMRegisterTwo
+                , set [M] $ A.Constant D
+                ]
+            , popToD
+            ,
+                [ symbolAddress "ARG"
+                , set [A] $ A.Constant M
+                , set [M] $ A.Constant D
+                , set [D] $ Unary A.Increment A
+                , stackPointer
+                , set [M] $ A.Constant D
+                ]
+            , concat
+                [ [ internalVMRegister
+                  , set [A, M] $ Unary A.Decrement M
+                  , set [D] $ A.Constant M
+                  , varAddress
+                  , set [M] $ A.Constant D
+                  ]
+                | varAddress <- symbolAddress <$> ["THAT", "THIS", "ARG", "LCL"]
+                ]
+            ,
+                [ internalVMRegisterTwo
+                , set [A] $ A.Constant M
+                , unconditionalJump
+                ]
+            ]
+        )
 
 
 -- HELPERS
@@ -496,6 +645,11 @@ stackPointer = symbolAddress "SP"
 -- | Go to @R13@, which is the first reserved slot for internal VM use.
 internalVMRegister :: Instruction
 internalVMRegister = symbolAddress "R13"
+
+
+-- | Go to @R13@, which is the second reserved slot for internal VM use.
+internalVMRegisterTwo :: Instruction
+internalVMRegisterTwo = symbolAddress "R14"
 
 
 -- | End of program loop

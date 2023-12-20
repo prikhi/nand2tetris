@@ -65,6 +65,7 @@ parseCommand =
         [ StackCommand <$> parseStackCommand
         , ArithLogicCommand <$> parseArithLogicCommand
         , BranchCommand <$> parseBranchCommand
+        , FunctionCommand <$> parseFunctionCommand
         ]
 
 
@@ -108,9 +109,21 @@ parseBranchCommand = do
             ]
     spaceChars
     constr <$> munch1 isLabelChar
+
+
+parseFunctionCommand :: ReadP FunctionCommand
+parseFunctionCommand =
+    choice
+        [ Return <$ string "return"
+        , parseFunction
+        ]
   where
-    isLabelChar :: Char -> Bool
-    isLabelChar c = any ($ c) [isAlphaNum, (== '_'), (== '.'), (== ':')]
+    parseFunction :: ReadP FunctionCommand
+    parseFunction = do
+        string "function" *> skipSpaces
+        functionName <- munch1 isLabelChar <* skipSpaces
+        argCount <- read <$> munch1 isDigit
+        return $ Function functionName argCount
 
 
 -- TODO: map c s to Utils
@@ -135,3 +148,7 @@ parseMemorySegment =
 -- | Consume space & tab characters
 spaceChars :: ReadP ()
 spaceChars = void $ munch (`elem` " \t")
+
+
+isLabelChar :: Char -> Bool
+isLabelChar c = any ($ c) [isAlphaNum, (== '_'), (== '.'), (== ':')]

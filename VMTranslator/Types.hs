@@ -37,6 +37,7 @@ data Command
     = StackCommand !StackCommand
     | ArithLogicCommand !ArithLogicCommand
     | BranchCommand !BranchCommand
+    | FunctionCommand !FunctionCommand
     deriving (Show)
 
 
@@ -63,4 +64,10 @@ data BranchCommand
     = Label !String
     | Goto !String
     | IfGoto !String
+    deriving (Show)
+
+
+data FunctionCommand
+    = Function !String !Word16
+    | Return
     deriving (Show)
