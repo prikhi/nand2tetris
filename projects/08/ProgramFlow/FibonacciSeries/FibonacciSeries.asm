@@ -78,7 +78,7 @@ D=M
 A=M
 M=D
 // label LOOP
-(FibonacciSeries.TODO$LOOP)
+($LOOP)
 // 	push argument 0
 @ARG
 A=M
@@ -91,13 +91,13 @@ M=D
 @SP
 AM=M-1
 D=M
-@FibonacciSeries.TODO$COMPUTE_ELEMENT
+@$COMPUTE_ELEMENT
 D;JNE
 // 	goto END                // otherwise, goto END
-@FibonacciSeries.TODO$END
+@$END
 0;JMP
 // label COMPUTE_ELEMENT
-(FibonacciSeries.TODO$COMPUTE_ELEMENT)
+($COMPUTE_ELEMENT)
 // 	push that 0
 @THAT
 A=M
@@ -191,10 +191,10 @@ D=M
 A=M
 M=D
 // 	goto LOOP
-@FibonacciSeries.TODO$LOOP
+@$LOOP
 0;JMP
 // label END
-(FibonacciSeries.TODO$END)
+($END)
 // execution complete, loop forever
 (VM_TRANSLATOR_END)
 @VM_TRANSLATOR_END

@@ -1,5 +1,5 @@
 // function SimpleFunction.test 2
-(SimpleFunction.SimpleFunction.test)
+(SimpleFunction.test)
 @LCL
 A=M
 M=0

@@ -430,9 +430,9 @@ generateBranchCommand state = \case
                , jumpOnD JumpNE
                ]
   where
-    -- Labels for branch commands are local to their File & Function names.
+    -- Labels for branch commands are local to their Function names.
     makeLabel :: String -> String
-    makeLabel sym = state.fileName <> "." <> state.currentFunction <> "$" <> sym
+    makeLabel sym = state.currentFunction <> "$" <> sym
 
 
 -- | Function commands manipulate the global stack frame and translator
@@ -444,7 +444,7 @@ generateFunctionCommand state = \case
         -- for the function & initialize it's local argument segment to
         -- zeros:
         --
-        -- > (<fileName>.<functionName>)
+        -- > (<functionName>)
         -- > @LCL
         -- > A = M
         -- > // for <argCount>:
@@ -458,7 +458,7 @@ generateFunctionCommand state = \case
         ( state {currentFunction = functionName}
         , concat
             [
-                [ LabelInstruction $ state.fileName <> "." <> functionName
+                [ LabelInstruction functionName
                 , symbolAddress "LCL"
                 , set [A] $ A.Constant M
                 ]

@@ -13,7 +13,7 @@ D=M
 A=M
 M=D
 // label LOOP
-(BasicLoop.TODO$LOOP)
+($LOOP)
 // 	push argument 0     
 @ARG
 A=M
@@ -83,7 +83,7 @@ M=D
 @SP
 AM=M-1
 D=M
-@BasicLoop.TODO$LOOP
+@$LOOP
 D;JNE
 // 	push local 0        // else, pushes sum to the stack's top
 @LCL
