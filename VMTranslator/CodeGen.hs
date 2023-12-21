@@ -297,20 +297,6 @@ generateStackCommand state c = case c of
                 "generateStackCommand: PROGRAMMER ERROR: attempted to call getOtherAddress for invalid segment: "
                     <> show c
 
-    -- Push the value in the D register onto the stack:
-    --
-    -- > @SP
-    -- > MA = M + 1
-    -- > A = A - 1
-    -- > M = D
-    pushDToStack :: [Instruction]
-    pushDToStack =
-        [ stackPointer
-        , set [M, A] $ Unary A.Increment M
-        , set [A] $ Unary A.Decrement A
-        , set [M] $ A.Constant D
-        ]
-
 
 generateArithLogicCommand :: TranslatorState -> ArithLogicCommand -> (TranslatorState, [Instruction])
 generateArithLogicCommand state = \case
@@ -565,6 +551,92 @@ generateFunctionCommand state = \case
                 ]
             ]
         )
+    Call functionName argsPushed ->
+        -- Call manages the global stack before a function call is
+        -- executed, pushing the calling functions return address & memory
+        -- segments, repositioning the memory segments, jumping to called
+        -- function, and emitting a return label for the call to return to:
+        --
+        -- > @<returnAddress>
+        -- > D = A
+        -- > @SP
+        -- > MA = M + 1
+        -- > A = A - 1
+        -- > M = D
+        -- > @LCL
+        -- > D = M
+        -- > @SP
+        -- > MA = M + 1
+        -- > A = A - 1
+        -- > M = D
+        -- > @ARG
+        -- > D = M
+        -- > @SP
+        -- > MA = M + 1
+        -- > A = A - 1
+        -- > M = D
+        -- > @THIS
+        -- > D = M
+        -- > @SP
+        -- > MA = M + 1
+        -- > A = A - 1
+        -- > M = D
+        -- > @THAT
+        -- > D = M
+        -- > @SP
+        -- > MA = M + 1
+        -- > A = A - 1
+        -- > M = D
+        -- > @<argCount>
+        -- > D = A
+        -- > @5
+        -- > D = D + A
+        -- > @SP
+        -- > D = M - D
+        -- > @ARG
+        -- > M = D
+        -- > @SP
+        -- > D = M
+        -- > @LCL
+        -- > M = D
+        -- > @<functionAddress>
+        -- > 0;JMP
+        -- > (<returnAddress>)
+
+        let (nextState, label, labelAddress) = makeFunctionReturnLabel state
+         in ( nextState
+            , concat
+                [
+                    [ AddressInstruction labelAddress
+                    , set [D] $ A.Constant A
+                    ]
+                , pushDToStack
+                , concat
+                    [ [ symbolAddress sym
+                      , set [D] $ A.Constant M
+                      ]
+                        <> pushDToStack
+                    | sym <- ["LCL", "ARG", "THIS", "THAT"]
+                    ]
+                ,
+                    [ constantAddress argsPushed
+                    , set [D] $ A.Constant A
+                    , constantAddress 5
+                    , set [D] $ Binary D A.Add A
+                    , stackPointer
+                    , set [D] $ Binary M A.Subtract D
+                    , symbolAddress "ARG"
+                    , set [M] $ A.Constant D
+                    , stackPointer
+                    , set [D] $ A.Constant M
+                    , symbolAddress "LCL"
+                    , set [M] $ A.Constant D
+                    , symbolAddress functionName
+                    , unconditionalJump
+                    , label
+                    ]
+                ]
+            )
 
 
 -- HELPERS
@@ -606,10 +678,34 @@ popToD =
     ]
 
 
+-- Push the value in the D register onto the stack:
+--
+-- > @SP
+-- > MA = M + 1
+-- > A = A - 1
+-- > M = D
+pushDToStack :: [Instruction]
+pushDToStack =
+    [ stackPointer
+    , set [M, A] $ Unary A.Increment M
+    , set [A] $ Unary A.Decrement A
+    , set [M] $ A.Constant D
+    ]
+
+
 makeConditionalTrueLabel :: DynamicLabelCounter -> (DynamicLabelCounter, Instruction, Address)
 makeConditionalTrueLabel counter =
     let labelSymbol = makeDynamicLabelSymbol "VM_TRANSLATOR_CONDITIONAL_TRUE_" counter
      in ( succ counter
+        , LabelInstruction labelSymbol
+        , SymbolAddress labelSymbol
+        )
+
+
+makeFunctionReturnLabel :: TranslatorState -> (TranslatorState, Instruction, Address)
+makeFunctionReturnLabel state =
+    let labelSymbol = makeDynamicLabelSymbol (state.currentFunction <> "ret.") state.labelCounter
+     in ( state {labelCounter = succ state.labelCounter}
         , LabelInstruction labelSymbol
         , SymbolAddress labelSymbol
         )

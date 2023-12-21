@@ -8,6 +8,7 @@ import Control.Monad (void)
 import Data.Char (isAlphaNum, isDigit)
 import Data.List qualified as L
 import Data.Maybe (mapMaybe)
+import Data.Word (Word16)
 import Text.ParserCombinators.ReadP
 import VMTranslator.Types
 
@@ -115,15 +116,16 @@ parseFunctionCommand :: ReadP FunctionCommand
 parseFunctionCommand =
     choice
         [ Return <$ string "return"
-        , parseFunction
+        , parseNameAndCount "function" Function
+        , parseNameAndCount "call" Call
         ]
   where
-    parseFunction :: ReadP FunctionCommand
-    parseFunction = do
-        string "function" *> skipSpaces
+    parseNameAndCount :: String -> (String -> Word16 -> FunctionCommand) -> ReadP FunctionCommand
+    parseNameAndCount label constr = do
+        string label *> skipSpaces
         functionName <- munch1 isLabelChar <* skipSpaces
         argCount <- read <$> munch1 isDigit
-        return $ Function functionName argCount
+        return $ constr functionName argCount
 
 
 -- TODO: map c s to Utils

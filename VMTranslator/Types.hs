@@ -70,4 +70,5 @@ data BranchCommand
 data FunctionCommand
     = Function !String !Word16
     | Return
+    | Call !String !Word16
     deriving (Show)
