@@ -36,26 +36,35 @@ ghc -Wcompat -Wall -Werror -O2 -RTS -threaded -odir dist -hidir dist \
 
 ## VM Translator
 
-Project 7 is a basic VM Translator that converts our VM's intermediate code
-into assembly code for the Hack hardware. It is located in the
-`VMTranslator.hs` file.
+Project 7 & 8 is a VM Translator that converts our VM's intermediate code into
+assembly code for the Hack hardware. It is located in the `VMTranslator.hs`
+file.
 
-The basic translator only handle arithmetic-logic commands & stack commands. It
-takes a `.vm` file as input & spits out the generated assembly code in a `.asm`
-file located in the same directory as the input file.
+It takes an optional folder or `.vm` file as input. After translation to
+assembly code, an `.asm` file will be written either inside the specified
+folder or alongside a specified VM file.
 
-It also only uses the standard library & requires no external dependencies:
+The final translator handles all VM commands for the hack platform. It will
+assemble a single file or assemble & concatenate all VM files if passed a
+folder. It includes the bootstrapping code, so it will no longer work with the
+Project 7 test files or the early Project 8 files. There are commits for each
+working older version.
+
+This uses slightly more than just the standard `base` package, however all
+packages used are part of the Core Libraries, so we can still get away with
+using just GHC:
 
 ```sh
-runghc --ghc-arg='-Wall' VMTranslator.hs projects/07/MemoryAccess/StaticTest/StaticTest.vm
+runghc --ghc-arg='-Wall' VMTranslator.hs projects/08/FunctionCalls/FibonacciElement
 ```
 
-You can compile it into an exectuable as well:
+You can compile it into an exectuable as well, though the number of modules has
+increased:
 
 ```sh
 ghc -Wcompat -Wall -Werror -O2 -RTS -threaded -odir dist -hidir dist \
     Assembler/* VMTranslator/* VMTranslator.hs -main-is VMTranslator -o vm-translator
-./vm-translator projects/07/MemoryAccess/StaticTest/StaticTest.vm
+./vm-translator projects/08/FunctionCalls/NestedCall
 ```
 
 

@@ -56,34 +56,140 @@ A=M
 D=A
 @SP
 M=M+D
-// 	push constant 4000	// tests that THIS and THAT are handled correctly
-@4000
+// 	push constant 6
+@6
 D=A
 @SP
 AM=M+1
 A=A-1
 M=D
-// 	pop pointer 0
-@SP
-AM=M-1
-D=M
-@THIS
-M=D
-// 	push constant 5000
-@5000
+// 	push constant 8
+@8
 D=A
 @SP
 AM=M+1
 A=A-1
 M=D
-// 	pop pointer 1
-@SP
-AM=M-1
-D=M
-@THAT
-M=D
-// 	call Sys.main 0
+// 	call Class1.set 2
 @Sys.init$ret.0
+D=A
+@SP
+AM=M+1
+A=A-1
+M=D
+@LCL
+D=M
+@SP
+AM=M+1
+A=A-1
+M=D
+@ARG
+D=M
+@SP
+AM=M+1
+A=A-1
+M=D
+@THIS
+D=M
+@SP
+AM=M+1
+A=A-1
+M=D
+@THAT
+D=M
+@SP
+AM=M+1
+A=A-1
+M=D
+@2
+D=A
+@5
+D=D+A
+@SP
+D=M-D
+@ARG
+M=D
+@SP
+D=M
+@LCL
+M=D
+@Class1.set
+0;JMP
+(Sys.init$ret.0)
+// 	pop temp 0 // dumps the return value
+@SP
+AM=M-1
+D=M
+@R5
+M=D
+// 	push constant 23
+@23
+D=A
+@SP
+AM=M+1
+A=A-1
+M=D
+// 	push constant 15
+@15
+D=A
+@SP
+AM=M+1
+A=A-1
+M=D
+// 	call Class2.set 2
+@Sys.init$ret.1
+D=A
+@SP
+AM=M+1
+A=A-1
+M=D
+@LCL
+D=M
+@SP
+AM=M+1
+A=A-1
+M=D
+@ARG
+D=M
+@SP
+AM=M+1
+A=A-1
+M=D
+@THIS
+D=M
+@SP
+AM=M+1
+A=A-1
+M=D
+@THAT
+D=M
+@SP
+AM=M+1
+A=A-1
+M=D
+@2
+D=A
+@5
+D=D+A
+@SP
+D=M-D
+@ARG
+M=D
+@SP
+D=M
+@LCL
+M=D
+@Class2.set
+0;JMP
+(Sys.init$ret.1)
+// 	pop temp 0 // dumps the return value
+@SP
+AM=M-1
+D=M
+@R5
+M=D
+// 	call Class1.get 0
+@Sys.init$ret.2
 D=A
 @SP
 AM=M+1
@@ -125,135 +231,11 @@ M=D
 D=M
 @LCL
 M=D
-@Sys.main
+@Class1.get
 0;JMP
-(Sys.init$ret.0)
-// 	pop temp 1
-@SP
-AM=M-1
-D=M
-@R6
-M=D
-// 	label LOOP
-(Sys.init$LOOP)
-// 	goto LOOP
-@Sys.init$LOOP
-0;JMP
-// function Sys.main 5
-(Sys.main)
-@LCL
-A=M
-M=0
-A=A+1
-M=0
-A=A+1
-M=0
-A=A+1
-M=0
-A=A+1
-M=0
-@5
-D=A
-@SP
-M=M+D
-// 	push constant 4001
-@4001
-D=A
-@SP
-AM=M+1
-A=A-1
-M=D
-// 	pop pointer 0
-@SP
-AM=M-1
-D=M
-@THIS
-M=D
-// 	push constant 5001
-@5001
-D=A
-@SP
-AM=M+1
-A=A-1
-M=D
-// 	pop pointer 1
-@SP
-AM=M-1
-D=M
-@THAT
-M=D
-// 	push constant 200
-@200
-D=A
-@SP
-AM=M+1
-A=A-1
-M=D
-// 	pop local 1
-@1
-D=A
-@LCL
-D=D+M
-@R13
-M=D
-@SP
-@SP
-AM=M-1
-D=M
-@R13
-A=M
-M=D
-// 	push constant 40
-@40
-D=A
-@SP
-AM=M+1
-A=A-1
-M=D
-// 	pop local 2
-@2
-D=A
-@LCL
-D=D+M
-@R13
-M=D
-@SP
-@SP
-AM=M-1
-D=M
-@R13
-A=M
-M=D
-// 	push constant 6
-@6
-D=A
-@SP
-AM=M+1
-A=A-1
-M=D
-// 	pop local 3
-@3
-D=A
-@LCL
-D=D+M
-@R13
-M=D
-@SP
-@SP
-AM=M-1
-D=M
-@R13
-A=M
-M=D
-// 	push constant 123
-@123
-D=A
-@SP
-AM=M+1
-A=A-1
-M=D
-// 	call Sys.add12 1
-@Sys.main$ret.1
+(Sys.init$ret.2)
+// 	call Class2.get 0
+@Sys.init$ret.3
 D=A
 @SP
 AM=M+1
@@ -283,7 +265,7 @@ D=M
 AM=M+1
 A=A-1
 M=D
-@1
+@0
 D=A
 @5
 D=D+A
@@ -295,87 +277,59 @@ M=D
 D=M
 @LCL
 M=D
-@Sys.add12
+@Class2.get
 0;JMP
-(Sys.main$ret.1)
-// 	pop temp 0
-@SP
-AM=M-1
-D=M
-@R5
-M=D
-// 	push local 0
+(Sys.init$ret.3)
+// label END
+(Sys.init$END)
+// 	goto END
+@Sys.init$END
+0;JMP
+// function Class1.set 0
+(Class1.set)
 @LCL
+A=M
+@0
+D=A
+@SP
+M=M+D
+// 	push argument 0
+@ARG
 A=M
 D=M
 @SP
 AM=M+1
 A=A-1
 M=D
-// 	push local 1
+// 	pop static 0
+@SP
+AM=M-1
+D=M
+@Class1.0
+M=D
+// 	push argument 1
 @1
 D=A
-@LCL
+@ARG
 A=M+D
 D=M
 @SP
 AM=M+1
 A=A-1
 M=D
-// 	push local 2
-@2
+// 	pop static 1
+@SP
+AM=M-1
+D=M
+@Class1.1
+M=D
+// 	push constant 0
+@0
 D=A
-@LCL
-A=M+D
-D=M
 @SP
 AM=M+1
 A=A-1
 M=D
-// 	push local 3
-@3
-D=A
-@LCL
-A=M+D
-D=M
-@SP
-AM=M+1
-A=A-1
-M=D
-// 	push local 4
-@4
-D=A
-@LCL
-A=M+D
-D=M
-@SP
-AM=M+1
-A=A-1
-M=D
-// 	add
-@SP
-AM=M-1
-D=M
-A=A-1
-M=M+D
-// 	add
-@SP
-AM=M-1
-D=M
-A=A-1
-M=M+D
-// 	add
-@SP
-AM=M-1
-D=M
-A=A-1
-M=M+D
-// 	add
-@SP
-AM=M-1
-D=M
-A=A-1
-M=M+D
 // 	return
 @LCL
 D=M
@@ -418,40 +372,84 @@ M=D
 @R14
 A=M
 0;JMP
-// function Sys.add12 0
-(Sys.add12)
+// function Class1.get 0
+(Class1.get)
 @LCL
 A=M
 @0
 D=A
 @SP
 M=M+D
-// 	push constant 4002
-@4002
-D=A
+// 	push static 0
+@Class1.0
+D=M
 @SP
 AM=M+1
 A=A-1
 M=D
-// 	pop pointer 0
+// 	push static 1
+@Class1.1
+D=M
+@SP
+AM=M+1
+A=A-1
+M=D
+// 	sub
 @SP
 AM=M-1
 D=M
-@THIS
-M=D
-// 	push constant 5002
-@5002
-D=A
-@SP
-AM=M+1
 A=A-1
+M=M-D
+// 	return
+@LCL
+D=M
+@R13
 M=D
-// 	pop pointer 1
+@5
+A=D-A
+D=M
+@R14
+M=D
 @SP
+AM=M-1
+D=M
+@ARG
+A=M
+M=D
+D=A+1
+@SP
+M=D
+@R13
 AM=M-1
 D=M
 @THAT
 M=D
+@R13
+AM=M-1
+D=M
+@THIS
+M=D
+@R13
+AM=M-1
+D=M
+@ARG
+M=D
+@R13
+AM=M-1
+D=M
+@LCL
+M=D
+@R14
+A=M
+0;JMP
+// function Class2.set 0
+(Class2.set)
+@LCL
+A=M
+@0
+D=A
+@SP
+M=M+D
 // 	push argument 0
 @ARG
 A=M
@@ -460,19 +458,105 @@ D=M
 AM=M+1
 A=A-1
 M=D
-// 	push constant 12
-@12
+// 	pop static 0
+@SP
+AM=M-1
+D=M
+@Class2.0
+M=D
+// 	push argument 1
+@1
+D=A
+@ARG
+A=M+D
+D=M
+@SP
+AM=M+1
+A=A-1
+M=D
+// 	pop static 1
+@SP
+AM=M-1
+D=M
+@Class2.1
+M=D
+// 	push constant 0
+@0
 D=A
 @SP
 AM=M+1
 A=A-1
 M=D
-// 	add
+// 	return
+@LCL
+D=M
+@R13
+M=D
+@5
+A=D-A
+D=M
+@R14
+M=D
+@SP
+AM=M-1
+D=M
+@ARG
+A=M
+M=D
+D=A+1
+@SP
+M=D
+@R13
+AM=M-1
+D=M
+@THAT
+M=D
+@R13
+AM=M-1
+D=M
+@THIS
+M=D
+@R13
+AM=M-1
+D=M
+@ARG
+M=D
+@R13
+AM=M-1
+D=M
+@LCL
+M=D
+@R14
+A=M
+0;JMP
+// function Class2.get 0
+(Class2.get)
+@LCL
+A=M
+@0
+D=A
+@SP
+M=M+D
+// 	push static 0
+@Class2.0
+D=M
+@SP
+AM=M+1
+A=A-1
+M=D
+// 	push static 1
+@Class2.1
+D=M
+@SP
+AM=M+1
+A=A-1
+M=D
+// 	sub
 @SP
 AM=M-1
 D=M
 A=A-1
-M=M+D
+M=M-D
 // 	return
 @LCL
 D=M

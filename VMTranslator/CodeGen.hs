@@ -14,19 +14,27 @@ import Data.Word (Word16)
 import VMTranslator.Types
 
 
--- | Given a parsed list of VM commands, return the assembly that performs
--- these commands on the Hack hardware.
+-- | Given a list of file names & parsed VM commands, return the assembly
+-- that performs these commands on the Hack hardware.
 --
 -- Each set of instructions will have it's original VM command prepended in
 -- a comment.
 --
--- We take in the basename of the file we are generating assembly for. This
--- lets us generate symbol addresses for each Static segment index.
-generateAssembly :: FilePath -> [(String, Command)] -> [AssemblyLine]
-generateAssembly fileName cs =
-    let (_, concat . reverse -> assemblyCode) =
-            L.foldl' generateCommand (initialState fileName, []) cs
-     in assemblyCode <> endLoop
+-- We take in the basename of each file we are generating assembly for.
+-- This lets us generate symbol addresses for each Static segment index.
+generateAssembly :: [(FilePath, [(String, Command)])] -> [AssemblyLine]
+generateAssembly parsedFiles =
+    concat
+        [ bootstrapCode
+        , concatMap
+            ( \(fileName, commands) ->
+                let (_, concat . reverse -> assemblyCode) =
+                        L.foldl' generateCommand (initialState fileName, []) commands
+                 in assemblyCode
+            )
+            parsedFiles
+        , endLoop
+        ]
 
 
 data TranslatorState = TranslatorState
@@ -704,7 +712,7 @@ makeConditionalTrueLabel counter =
 
 makeFunctionReturnLabel :: TranslatorState -> (TranslatorState, Instruction, Address)
 makeFunctionReturnLabel state =
-    let labelSymbol = makeDynamicLabelSymbol (state.currentFunction <> "ret.") state.labelCounter
+    let labelSymbol = makeDynamicLabelSymbol (state.currentFunction <> "$ret.") state.labelCounter
      in ( state {labelCounter = succ state.labelCounter}
         , LabelInstruction labelSymbol
         , SymbolAddress labelSymbol
@@ -746,6 +754,26 @@ internalVMRegister = symbolAddress "R13"
 -- | Go to @R13@, which is the second reserved slot for internal VM use.
 internalVMRegisterTwo :: Instruction
 internalVMRegisterTwo = symbolAddress "R14"
+
+
+-- | Beginning of program
+bootstrapCode :: [AssemblyLine]
+bootstrapCode =
+    let sysInitCall =
+            snd
+                $ generateFunctionCommand
+                    ( (initialState "VM_BOOTSTRAP")
+                        { currentFunction = "VM_BOOTSTRAP.bootstrap"
+                        }
+                    )
+                $ Call "Sys.init" 0
+     in [ AssemblyComment " bootstrap initial execution"
+        , InstructionLine $ constantAddress 256
+        , InstructionLine $ set [D] $ A.Constant A
+        , InstructionLine $ symbolAddress "SP"
+        , InstructionLine $ set [M] $ A.Constant D
+        ]
+            <> map InstructionLine sysInitCall
 
 
 -- | End of program loop
