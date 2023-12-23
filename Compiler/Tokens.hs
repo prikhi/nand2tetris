@@ -6,12 +6,12 @@ import Data.Text (Text)
 
 
 data Token
-    = KeywordTok KeywordTok
-    | SymbolTok SymbolTok
-    | IntegerTok Int16
-    | StringTok Text
-    | IdentifierTok Text
-    | CommentTok Text
+    = KeywordTok !KeywordTok
+    | SymbolTok !SymbolTok
+    | IntegerTok !Int16
+    | StringTok !Text
+    | IdentifierTok !Text
+    | CommentTok !Text
     deriving (Show, Eq, Ord)
 
 

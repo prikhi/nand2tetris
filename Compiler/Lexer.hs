@@ -1,5 +1,8 @@
 -- | Parse jack files into 'Token' streams
-module Compiler.Lexer where
+module Compiler.Lexer
+    ( tokenize
+    , SourceToken (..)
+    ) where
 
 import Compiler.Tokens
 import Data.Int (Int16)
