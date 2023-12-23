@@ -6,7 +6,7 @@ module Compiler.Lexer
 
 import Compiler.Tokens
 import Data.Int (Int16)
-import Data.Text (Text, pack)
+import Data.Text (Text, pack, unpack)
 import Text.Parsec
 import Text.Parsec.Text
 
@@ -57,7 +57,7 @@ parseInteger = do
 parseIdentifier :: Parser Text
 parseIdentifier = do
     c <- letter
-    rest <- many $ alphaNum <|> char '.'
+    rest <- many $ alphaNum <|> char '_'
     return $ pack $ c : rest
 
 
@@ -73,54 +73,10 @@ parseComment =
 parseSymbol :: Parser SymbolTok
 parseSymbol =
     choice $
-        map
-            (\(v, s) -> v <$ char s)
-            [ (OpenBraceTok, '{')
-            , (CloseBraceTok, '}')
-            , (OpenParenTok, '(')
-            , (CloseParenTok, ')')
-            , (OpenBrackTok, '[')
-            , (CloseBrackTok, ']')
-            , (DotTok, '.')
-            , (CommaTok, ',')
-            , (SemiColonTok, ';')
-            , (PlusTok, '+')
-            , (MinusTok, '-')
-            , (StarTok, '*')
-            , (SlashTok, '/')
-            , (AndTok, '&')
-            , (PipeTok, '|')
-            , (LessTok, '<')
-            , (GreaterTok, '>')
-            , (EqualTok, '=')
-            , (TildeTok, '~')
-            ]
+        map (\v -> v <$ char (renderSymbol v)) [minBound .. maxBound]
 
 
 parseKeyword :: Parser KeywordTok
 parseKeyword =
     try . choice $
-        map
-            (\(v, s) -> v <$ string s)
-            [ (ClassTok, "class")
-            , (ConstructorTok, "constructor")
-            , (FunctionTok, "function")
-            , (MethodTok, "method")
-            , (FieldTok, "field")
-            , (StaticTok, "static")
-            , (VarTok, "var")
-            , (IntTok, "int")
-            , (CharTok, "char")
-            , (BooleanTok, "boolean")
-            , (VoidTok, "void")
-            , (TrueTok, "true")
-            , (FalseTok, "false")
-            , (NullTok, "null")
-            , (ThisTok, "this")
-            , (LetTok, "let")
-            , (DoTok, "do")
-            , (IfTok, "if")
-            , (ElseTok, "else")
-            , (WhileTok, "while")
-            , (ReturnTok, "return")
-            ]
+        map (\v -> v <$ try (string $ unpack $ renderKeyword v)) [minBound .. maxBound]

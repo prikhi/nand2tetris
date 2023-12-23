@@ -2,9 +2,10 @@
 
 module Compiler (main) where
 
-import Compiler.Lexer (tokenize)
+import Compiler.Lexer (tok, tokenize)
+import Compiler.TokenRenderer (tokensToXml)
 import Data.List (intercalate)
-import Data.Text.IO qualified as T (readFile)
+import Data.Text.IO qualified as T (putStr, readFile)
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
 
@@ -33,5 +34,5 @@ runCompiler :: FilePath -> IO ()
 runCompiler jackPath = do
     txt <- T.readFile jackPath
     case tokenize jackPath txt of
-        Left e -> print e
-        Right ts -> mapM_ print ts
+        Left e -> print e >> exitFailure
+        Right ts -> T.putStr $ tokensToXml $ map tok ts
