@@ -2,12 +2,12 @@
 
 module Compiler (main) where
 
-import Compiler.Lexer (tok, tokenize)
-import Compiler.TokenRenderer (tokensToXml)
+import Compiler.Lexer (tokenize)
+import Compiler.Parser (parseAST)
 import Control.Arrow ((&&&))
 import Control.Monad (forM_)
 import Data.List (intercalate)
-import Data.Text.IO qualified as T (readFile, writeFile)
+import Data.Text.IO qualified as T (readFile) -- , writeFile)
 import System.Directory (doesFileExist, getCurrentDirectory, listDirectory)
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
@@ -47,13 +47,14 @@ main =
 runCompiler :: FilePath -> IO ()
 runCompiler jackPath = do
     files <- getFiles
-    forM_ files $ \(outputPath, filePath) -> do
+    forM_ files $ \(_outputPath, filePath) -> do
         txt <- T.readFile filePath
-        xml <- case tokenize filePath txt of
+        case tokenize filePath txt >>= parseAST filePath of
             Left e -> print e >> exitFailure
-            Right ts -> return . tokensToXml $ map tok ts
-        T.writeFile outputPath xml
+            Right parsedClass -> print parsedClass
   where
+    -- T.writeFile outputPath xml
+
     -- Get files to process & make the output file path
     getFiles :: IO [(FilePath, FilePath)]
     getFiles = do
