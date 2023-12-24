@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Parse token stream into an AST type.
 module Compiler.Parser
@@ -8,15 +9,25 @@ module Compiler.Parser
 import Compiler.AST
 import Compiler.Lexer (SourceToken (..))
 import Compiler.Tokens
+import Compiler.XmlWriter (escapeXmlVal)
 import Control.Monad (void)
-import Data.Int (Int16)
+import Data.Bifunctor (second)
+import Data.Int (Int16, Int64)
 import Data.List.NonEmpty (fromList)
 import Data.Text (Text)
+import Data.Text qualified as T
+import Data.Text.Lazy qualified as TL
+import Data.Text.Lazy.Builder qualified as TB
 import Text.Parsec
 
 
-parseAST :: FilePath -> [SourceToken] -> Either ParseError Class
-parseAST fp = parse (parseClass <* eof) fp . filter (notComment . tok)
+-- | Parse the AST from a file's token stream, returning the top-level
+-- Class declaration and lazily-constructed XML output.
+parseAST :: FilePath -> [SourceToken] -> Either ParseError (Class, TL.Text)
+parseAST fp =
+    fmap (second (TB.toLazyText . snd))
+        . runParser ((,) <$> parseClass <*> getState <* eof) (0, mempty) fp
+        . filter (notComment . tok)
   where
     notComment :: Token -> Bool
     notComment = \case
@@ -26,11 +37,43 @@ parseAST fp = parse (parseClass <* eof) fp . filter (notComment . tok)
 
 -- TOKEN STREAM PARSER
 
-type Parser = Parsec [SourceToken] ()
+-- | We parse a stream of 'SourceToken' and track an indentation about and
+-- Lazy Text builder.
+type Parser = Parsec [SourceToken] (Int64, TB.Builder)
 
 
+-- | Expect lets us provide a matching function on the token while also
+-- appending the token XML to our parser state.
 expect_ :: (SourceToken -> Maybe a) -> Parser a
-expect_ = token show pos
+expect_ =
+    tokenPrimEx
+        (displayToken . tok)
+        (\_ st _ -> pos st)
+        ( Just $ \_ st _ (indent, xml) ->
+            (indent, xml <> mkTokenXml indent st)
+        )
+  where
+    mkTokenXml :: Int64 -> SourceToken -> TB.Builder
+    mkTokenXml i st =
+        let (tagName, tagVal) = renderToken $ tok st
+            (open, close) = makeOpenAndCloseTags tagName
+         in mconcat
+                [ makeIndentText i
+                , open
+                , " "
+                , tagVal
+                , " "
+                , close
+                , "\n"
+                ]
+    renderToken :: Token -> (TB.Builder, TB.Builder)
+    renderToken = \case
+        CommentTok {} -> ("comment", "")
+        IntegerTok i -> ("integerConstant", TB.fromString (show i))
+        StringTok s -> ("stringConstant", TB.fromText (escapeXmlVal s))
+        IdentifierTok ident -> ("identifier", TB.fromText ident)
+        KeywordTok kw -> ("keyword", TB.fromText (renderKeyword kw))
+        SymbolTok sym -> ("symbol", TB.fromText (escapeXmlVal (T.singleton (renderSymbol sym))))
 
 
 expectKeyword :: KeywordTok -> Parser KeywordTok
@@ -67,10 +110,38 @@ expectString = expect_ $ \st -> case tok st of
     _ -> Nothing
 
 
+-- XML GENERATION
+
+-- | Write open tag for parent, increase indentation, run child parser,
+-- decrease indentation, write close tag for parent.
+withParentNode :: TB.Builder -> Parser a -> Parser a
+withParentNode node action = do
+    (parentIndent, _) <- getState
+    let (open, close) = makeOpenAndCloseTags node
+        indentText = makeIndentText parentIndent
+    modifyState $ \(indent, xml) -> (succ indent, xml <> indentText <> open <> "\n")
+    val <- action
+    modifyState $ \(indent, xml) -> (pred indent, xml <> indentText <> close <> "\n")
+    return val
+
+
+-- | Build the string of space characters for a given indentation level.
+makeIndentText :: Int64 -> TB.Builder
+makeIndentText indent = TB.fromLazyText $ TL.replicate (indent * 2) " "
+
+
+-- | Build the open & close XML tags for a node.
+makeOpenAndCloseTags :: TB.Builder -> (TB.Builder, TB.Builder)
+makeOpenAndCloseTags node =
+    ( mconcat ["<", node, ">"]
+    , mconcat ["</", node, ">"]
+    )
+
+
 -- PARSING
 
 parseClass :: Parser Class
-parseClass = do
+parseClass = withParentNode "class" $ do
     expectKeyword_ ClassTok
     className <- expectIdentifier
     expectSymbol_ OpenBraceTok
@@ -81,7 +152,7 @@ parseClass = do
 
 
 parseClassVarDec :: Parser ClassVarDec
-parseClassVarDec = do
+parseClassVarDec = withParentNode "classVarDec" $ do
     constr <-
         choice
             [ StaticVar <$ expectKeyword StaticTok
@@ -104,7 +175,7 @@ parseType =
 
 
 parseSubroutineDec :: Parser SubroutineDec
-parseSubroutineDec = do
+parseSubroutineDec = withParentNode "subroutineDec" $ do
     constr <-
         choice
             [ ConstructorFunc <$ expectKeyword ConstructorTok
@@ -125,17 +196,18 @@ parseSubroutineDec = do
 
 parseParameterList :: Parser ParameterList
 parseParameterList =
-    ParameterList
-        <$> sepBy
-            ( (,)
-                <$> parseType
-                <*> expectIdentifier
-            )
-            (expectSymbol CommaTok)
+    withParentNode "parameterList" $
+        ParameterList
+            <$> sepBy
+                ( (,)
+                    <$> parseType
+                    <*> expectIdentifier
+                )
+                (expectSymbol CommaTok)
 
 
 parseSubroutineBody :: Parser SubroutineBody
-parseSubroutineBody = do
+parseSubroutineBody = withParentNode "subroutineBody" $ do
     expectSymbol_ OpenBraceTok
     localVars <- many parseLocalVarDec
     statements <- parseStatements
@@ -144,7 +216,7 @@ parseSubroutineBody = do
 
 
 parseLocalVarDec :: Parser LocalVarDec
-parseLocalVarDec = do
+parseLocalVarDec = withParentNode "varDec" $ do
     expectKeyword_ VarTok
     typ <- parseType
     varNames <- fromList <$> sepBy1 expectIdentifier (expectSymbol CommaTok)
@@ -153,17 +225,17 @@ parseLocalVarDec = do
 
 
 parseStatements :: Parser [Statement]
-parseStatements = many parseStatement
+parseStatements = withParentNode "statements" $ many parseStatement
 
 
 parseStatement :: Parser Statement
 parseStatement =
     choice
-        [ parseLet
-        , parseIf
-        , parseWhile
-        , parseDo
-        , parseReturn
+        [ withParentNode "letStatement" parseLet
+        , withParentNode "ifStatement" parseIf
+        , withParentNode "whileStatement" parseWhile
+        , withParentNode "doStatement" parseDo
+        , withParentNode "returnStatement" parseReturn
         ]
   where
     parseLet :: Parser Statement
@@ -229,34 +301,37 @@ parseSubroutineCall = do
 
 parseExpressionList :: Parser ExpressionList
 parseExpressionList =
-    ExpressionList <$> sepBy parseExpression (expectSymbol_ CommaTok)
+    withParentNode "expressionList" $
+        ExpressionList <$> sepBy parseExpression (expectSymbol_ CommaTok)
 
 
 parseExpression :: Parser Expression
 parseExpression =
-    Expression
-        <$> parseTerm
-        <*> option
-            []
-            ( many $
-                (,) <$> parseBinaryOp <*> parseTerm
-            )
+    withParentNode "expression" $
+        Expression
+            <$> parseTerm
+            <*> option
+                []
+                ( many $
+                    (,) <$> parseBinaryOp <*> parseTerm
+                )
 
 
 parseTerm :: Parser Term
 parseTerm =
-    choice
-        [ IntTerm <$> expectInteger
-        , StringTerm <$> expectString
-        , KeywordTerm <$> parseConstant
-        , UnaryOpTerm <$> parseUnaryOp <*> parseTerm
-        , parseParenthesizedTerm
-        , choice
-            [ try $ SubroutineTerm <$> parseSubroutineCall
-            , try parseArrayElementTerm
-            , VarTerm <$> expectIdentifier
+    withParentNode "term" $
+        choice
+            [ IntTerm <$> expectInteger
+            , StringTerm <$> expectString
+            , KeywordTerm <$> parseConstant
+            , UnaryOpTerm <$> parseUnaryOp <*> parseTerm
+            , parseParenthesizedTerm
+            , choice
+                [ try $ SubroutineTerm <$> parseSubroutineCall
+                , try parseArrayElementTerm
+                , VarTerm <$> expectIdentifier
+                ]
             ]
-        ]
   where
     parseArrayElementTerm :: Parser Term
     parseArrayElementTerm = do

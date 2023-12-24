@@ -6,6 +6,7 @@ module Compiler.Tokens where
 
 import Data.Int (Int16)
 import Data.Text (Text)
+import Data.Text qualified as T (elem, unpack)
 
 
 data Token
@@ -16,6 +17,16 @@ data Token
     | IdentifierTok !Text
     | CommentTok !Text
     deriving (Show, Eq, Ord)
+
+
+displayToken :: Token -> String
+displayToken = \case
+    SymbolTok s -> [renderSymbol s]
+    KeywordTok k -> T.unpack $ renderKeyword k
+    IntegerTok i -> show i
+    StringTok s -> show s
+    IdentifierTok s -> show s
+    CommentTok s -> T.unpack $ if '\n' `T.elem` s then "/*" <> s <> "*/" else "//" <> s
 
 
 data KeywordTok

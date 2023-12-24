@@ -6,6 +6,7 @@ module Compiler.XmlWriter
     , withRootNode
     , withParentNode
     , textNode
+    , escapeXmlVal
     ) where
 
 import Data.Text (Text)
@@ -81,19 +82,22 @@ withParentNode node (XmlWriter inner) = XmlWriter $ \i ->
 textNode :: Text -> Text -> Xml
 textNode tag val = XmlWriter $ \i ->
     let indent = T.replicate (i * 4) " "
-        node = T.concat [indent, writeOpen tag, " ", escapeVal val, " ", writeClose tag]
+        node = T.concat [indent, writeOpen tag, " ", escapeXmlVal val, " ", writeClose tag]
      in ([node], ())
-  where
-    escapeVal :: Text -> Text
-    escapeVal t =
-        foldr
-            (uncurry T.replace)
-            t
-            [ ("<", "&lt;")
-            , (">", "&gt;")
-            , ("&", "&amp;")
-            , ("\"", "&quot;")
-            ]
+
+
+-- | Perform any necessary escape sequence replacements for characters in
+-- an XML node's inner value.
+escapeXmlVal :: Text -> Text
+escapeXmlVal t =
+    foldr
+        (uncurry T.replace)
+        t
+        [ ("<", "&lt;")
+        , (">", "&gt;")
+        , ("\"", "&quot;")
+        , ("&", "&amp;")
+        ]
 
 
 writeOpen :: Text -> Text

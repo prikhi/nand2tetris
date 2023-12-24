@@ -7,7 +7,7 @@ general Computer. These are located in their respective folders within the
 `projects/` directory.
 
 The software projects are built using Haskell. You need [GHC][ghcup] for the
-assembler, and will likely need [stack][stack] for further projects.
+Assembler, VM Translator, & Compiler.
 
 
 ## Assembler
@@ -68,10 +68,43 @@ ghc -Wcompat -Wall -Werror -O2 -RTS -threaded -odir dist -hidir dist \
 ```
 
 
+## Compiler
+
+Project 10 begins the process of creating a Jack compiler that outputs
+intermediate VM code. It is located in the `Compiler.hs` file.
+
+Like the VM Translator, the compiler can operate on a single `.jack` file or a
+directory. It does not concatenate the files, but outputs a matching
+`<filename>.vm` file alongside each of it's input files.
+
+We do not current compile the Jack code into VM code. Instead, we tokenize the
+file, parse the token stream into a Jack abstract syntax tree and output the
+final parsing result as a `<filename>.xml` file.
+
+Project 11 will add support for actually compiling the result of parsing.
+
+We've expanded our library set further, opting to use `parsec` for both the
+lexer & parser as it can handle both `Text` input and our custom `Token` input.
+As of GHC 9.6, this is also bundled with the compiler, so `runghc` should
+continue to work fine:
+
+```sh
+runghc --ghc-arg='-Wall' Compiler.hs projects/10/Square
+```
+
+You can compile this into an executable as well which drops the execution time
+from ~200ms to ~10ms, but is not really necessary:
+
+```sh
+ghc -Wcompat -Wall -Werror -O2 -RTS -threaded -odir dist -hidir dist \
+    Compiler/* Compiler.hs -main-is Compiler -o compiler
+./compiler projects/10/Square
+```
+
+
 ## LICENSE
 
 GPL-3.0+
 
 
 [ghcup]: https://www.haskell.org/ghcup/
-[stack]: https://www.haskellstack.org/

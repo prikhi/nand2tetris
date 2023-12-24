@@ -1,2 +1,4 @@
 /assembler
+/compiler 
+/vm-translator
 dist/

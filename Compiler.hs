@@ -5,9 +5,10 @@ module Compiler (main) where
 import Compiler.Lexer (tokenize)
 import Compiler.Parser (parseAST)
 import Control.Arrow ((&&&))
-import Control.Monad (forM_)
+import Control.Monad (forM_, when)
 import Data.List (intercalate)
-import Data.Text.IO qualified as T (readFile) -- , writeFile)
+import Data.Text.IO qualified as T (readFile)
+import Data.Text.Lazy.IO qualified as TL (writeFile)
 import System.Directory (doesFileExist, getCurrentDirectory, listDirectory)
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
@@ -37,9 +38,9 @@ main =
                     , ""
                     , "Compiler.hs [<FILE_NAME>.jack|<DIRECTORY>]"
                     , ""
-                    , "Reads input file or `.jack` files in directory."
-                    , "Tokenizes each file exiting with error on failure."
-                    , "Writes result to `<FILE_NAME>T.xml` in same directory as input file."
+                    , "Reads input file or `.jack` files in input directory."
+                    , "Tokenizes & parses each file, exiting with error on failure."
+                    , "Writes result to `<FILE_NAME>.xml` in same directory as input file."
                     ]
             exitFailure
 
@@ -47,26 +48,26 @@ main =
 runCompiler :: FilePath -> IO ()
 runCompiler jackPath = do
     files <- getFiles
-    forM_ files $ \(_outputPath, filePath) -> do
+    forM_ files $ \(outputPath, filePath) -> do
         txt <- T.readFile filePath
         case tokenize filePath txt >>= parseAST filePath of
             Left e -> print e >> exitFailure
-            Right parsedClass -> print parsedClass
+            Right (_, xml) -> TL.writeFile outputPath xml
   where
-    -- T.writeFile outputPath xml
-
-    -- Get files to process & make the output file path
+    -- Get files to process & make the output file paths
     getFiles :: IO [(FilePath, FilePath)]
     getFiles = do
         isFile <- doesFileExist jackPath
         if isFile
             then case splitExtension jackPath of
                 (basePath, ".jack") ->
-                    return [(basePath <> "T" <.> "xml", jackPath)]
+                    return [(basePath <.> "xml", jackPath)]
                 _ ->
-                    error "ERROR: Expected input file with extension '.vm"
+                    error "ERROR: Expected input file with extension '.jack"
             else do
                 allFiles <- map (jackPath </>) <$> listDirectory jackPath
                 let jackFiles = filter ((== ".jack") . takeExtension) allFiles
-                    mkOutputPath fileName = jackPath </> dropExtension (takeBaseName fileName) <> "T" <.> "xml"
+                when (null jackFiles) $
+                    error "ERROR: No '.jack' files found in directory."
+                let mkOutputPath fileName = jackPath </> dropExtension (takeBaseName fileName) <.> "xml"
                 return $ map (mkOutputPath &&& id) jackFiles
