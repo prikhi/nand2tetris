@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Parse token stream into an AST type.
 module Compiler.Parser
@@ -176,22 +177,23 @@ parseType =
 
 parseSubroutineDec :: Parser SubroutineDec
 parseSubroutineDec = withParentNode "subroutineDec" $ do
-    constr <-
+    subroutineType <-
         choice
-            [ ConstructorFunc <$ expectKeyword ConstructorTok
-            , FunctionFunc <$ expectKeyword FunctionTok
-            , MethodFunc <$ expectKeyword MethodTok
+            [ Constructor <$ expectKeyword ConstructorTok
+            , Function <$ expectKeyword FunctionTok
+            , Method <$ expectKeyword MethodTok
             ]
-    typ <-
+    returnType <-
         choice
             [ Just <$> parseType
             , Nothing <$ expectKeyword VoidTok
             ]
     subroutineName <- expectIdentifier
     expectSymbol_ OpenParenTok
-    paramList <- parseParameterList
+    parameters <- parseParameterList
     expectSymbol_ CloseParenTok
-    constr typ subroutineName paramList <$> parseSubroutineBody
+    subroutineBody <- parseSubroutineBody
+    return SubroutineDec {..}
 
 
 parseParameterList :: Parser ParameterList

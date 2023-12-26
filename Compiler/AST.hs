@@ -37,19 +37,25 @@ data Type
 
 
 -- | Function declarations for class subroutines
-data SubroutineDec
-    = ConstructorFunc
-        (Maybe Type)
-        -- ^ Nothing is Void type
-        Text
-        -- ^ Name
-        ParameterList
-        -- ^ Args
-        SubroutineBody
-        -- ^ Body Code
-    | FunctionFunc (Maybe Type) Text ParameterList SubroutineBody
-    | MethodFunc (Maybe Type) Text ParameterList SubroutineBody
+data SubroutineDec = SubroutineDec
+    { subroutineType :: SubroutineType
+    , returnType :: Maybe Type
+    -- ^ Nothing is Void type
+    , subroutineName :: Text
+    -- ^ Name
+    , parameters :: ParameterList
+    -- ^ Args
+    , subroutineBody :: SubroutineBody
+    -- ^ Body Code
+    }
     deriving (Show)
+
+
+data SubroutineType
+    = Constructor
+    | Function
+    | Method
+    deriving (Show, Eq)
 
 
 -- | Pairs of function argument types & identfiers

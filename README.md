@@ -70,35 +70,40 @@ ghc -Wcompat -Wall -Werror -O2 -RTS -threaded -odir dist -hidir dist \
 
 ## Compiler
 
-Project 10 begins the process of creating a Jack compiler that outputs
-intermediate VM code. It is located in the `Compiler.hs` file.
+Project 10 & 11 are a Jack compiler that outputs the intermediate VM code to be
+used with the VM Translator. It is located in the `Compiler.hs` file.
 
 Like the VM Translator, the compiler can operate on a single `.jack` file or a
-directory. It does not concatenate the files, but outputs a matching
-`<filename>.vm` file alongside each of it's input files.
+directory. It does not concatenate the files, but outputs a series of files
+alongside each of it's input files.
 
-We do not current compile the Jack code into VM code. Instead, we tokenize the
-file, parse the token stream into a Jack abstract syntax tree and output the
-final parsing result as a `<filename>.xml` file.
+The final compiler tokenizes each input file, parse the token stream into a
+Jack abstract syntax tree, compiles the AST into a series of VM commands, and
+outputs the final result as a `<filename>.vm` file. You can run the compiled
+output by loading a compiled folder into the `VMEmulator` in the `tools`
+directory.
 
-Project 11 will add support for actually compiling the result of parsing.
+While project 10 had us emitting XML of the parsed token stream, the final
+compiler only outputs VM files. However, we still generate this XML during
+parsing, & it is available for printing/writing by editing the
+`Compiler.runCompiler` function.
 
 We've expanded our library set further, opting to use `parsec` for both the
 lexer & parser as it can handle both `Text` input and our custom `Token` input.
-As of GHC 9.6, this is also bundled with the compiler, so `runghc` should
-continue to work fine:
+As of GHC 9.6, both the `parsec` & `text` libraries are bundled with the
+compiler, so `runghc` should continue to work fine:
 
 ```sh
-runghc --ghc-arg='-Wall' Compiler.hs projects/10/Square
+runghc --ghc-arg='-Wall' Compiler.hs projects/11/Pong
 ```
 
 You can compile this into an executable as well which drops the execution time
-from ~200ms to ~10ms, but is not really necessary:
+from ~300ms to ~10ms, but is not really necessary for the projects:
 
 ```sh
 ghc -Wcompat -Wall -Werror -O2 -RTS -threaded -odir dist -hidir dist \
-    Compiler/* Compiler.hs -main-is Compiler -o compiler
-./compiler projects/10/Square
+    Compiler/* VMTranslator/* Compiler.hs -main-is Compiler -o compiler
+./compiler projects/11/Pong
 ```
 
 
