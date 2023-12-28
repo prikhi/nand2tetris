@@ -7,7 +7,7 @@
  * This library provides two services: direct access to the computer's main
  * memory (RAM), and allocation and recycling of memory blocks. The Hack RAM
  * consists of 32,768 words, each holding a 16-bit binary number.
- */
+ */ 
 class Memory {
     static Array RAM;
     static int heapBase;
@@ -37,7 +37,7 @@ class Memory {
     /** Finds an available RAM block of the given size and returns
      *  a reference to its base address. */
     function int alloc(int size) {
-        var int block, pointerSize, pointer, foundPointer, prevPointer, nextPointer;
+        var int block, pointerSize, pointer, foundPointer, prevPointer, nextPointer; 
         let pointer = freeList;
         let prevPointer = pointer;
         // recurse down list until we find large enough block
@@ -83,5 +83,5 @@ class Memory {
         let RAM[endOfList + 1] = o - 1;
         let RAM[o] = 0;
         return;
-    }
+    }    
 }

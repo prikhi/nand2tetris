@@ -70,12 +70,12 @@ class Math {
             let z = q_ + 1;
         }
 
-        if (~((x < 0) & (y < 0))) {
+        if (~((x < 0) & (y < 0))) { 
             if (x < 0) {
-                let z = -z;
+                let z = -z; 
             }
             if (y < 0) {
-                let z = -z;
+                let z = -z; 
             }
         }
         return z;

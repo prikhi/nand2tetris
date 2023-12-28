@@ -6,8 +6,16 @@ Projects 1-5 are HDL specifications for Logic Gates, ALU, Memory, CPU, & the
 general Computer. These are located in their respective folders within the
 `projects/` directory.
 
-The software projects are built using Haskell. You need [GHC][ghcup] for the
+The software projects(6-11) are built using Haskell. You need [GHC][ghcup] for the
 Assembler, VM Translator, & Compiler.
+
+Project 12 is the Hack OS & is written in Jack. It is located in the
+`projects/12` directory, each individual file has been copied to it's Test
+sub-folder & passes the scripted/interactive tests. The full OS has been copied
+to the `projects/11/Pong` folder & compiled with our compiler. It works but
+paddle drawing is slightly buggy & the game in general is slow. There are
+improvements that could be made in the `Screen.jack` file that would speed this
+up.
 
 
 ## Assembler

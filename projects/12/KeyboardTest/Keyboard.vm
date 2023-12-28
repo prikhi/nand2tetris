@@ -1,0 +1,110 @@
+function Keyboard.init 0
+push constant 24576
+pop static 0
+push constant 0
+return
+function Keyboard.keyPressed 0
+push static 0
+call Memory.peek 1
+return
+function Keyboard.readChar 1
+push constant 0
+call Output.printChar 1
+pop temp 0
+call Keyboard.keyPressed 0
+pop local 0
+label 0
+push local 0
+push constant 0
+eq
+not
+if-goto 1
+call Keyboard.keyPressed 0
+pop local 0
+goto 0
+label 1
+label 2
+call Keyboard.keyPressed 0
+push constant 0
+eq
+not
+not
+if-goto 3
+goto 2
+label 3
+push local 0
+call String.newLine 0
+eq
+not
+not
+if-goto 4
+call Output.backSpace 0
+pop temp 0
+push local 0
+call Output.printChar 1
+pop temp 0
+goto 5
+label 4
+label 5
+push local 0
+return
+function Keyboard.readLine 3
+push constant 64
+call String.new 1
+pop local 1
+push constant 0
+pop local 0
+push argument 0
+call Output.printString 1
+pop temp 0
+label 0
+push local 0
+not
+not
+if-goto 1
+call Keyboard.readChar 0
+pop local 2
+push local 2
+call String.backSpace 0
+eq
+not
+if-goto 2
+push local 1
+call String.eraseLastChar 1
+pop temp 0
+goto 3
+label 2
+push local 2
+call String.newLine 0
+eq
+not
+if-goto 4
+push constant 1
+neg
+pop local 0
+call Output.println 0
+pop temp 0
+goto 5
+label 4
+push local 1
+push local 2
+call String.appendChar 2
+pop temp 0
+label 5
+label 3
+goto 0
+label 1
+push local 1
+return
+function Keyboard.readInt 2
+push argument 0
+call Keyboard.readLine 1
+pop local 0
+push local 0
+call String.intValue 1
+pop local 1
+push local 0
+call String.dispose 1
+pop temp 0
+push local 1
+return
